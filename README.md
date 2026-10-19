@@ -58,9 +58,6 @@ In the GitHub repository, create a `production` environment and add these Action
 | `VPS_SSH_KEY` | Private Ed25519 key whose public key is in the user's `~/.ssh/authorized_keys` |
 | `VPS_DEPLOY_PATH` | Directory served by the download page, for example `/var/www/music-control-download` |
 
-Also create the repository variable `VPS_DEPLOY_ENABLED` with the value `true`. Keeping this
-variable off lets the Windows build run while the deployment credentials are being configured.
-
 The deployment keeps timestamped `.bak-<commit>` copies of the current installer and page before
 installing the new files. For stronger SSH host verification, replace the workflow's `ssh-keyscan`
 step with a reviewed `VPS_KNOWN_HOSTS` secret.
