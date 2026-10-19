@@ -446,6 +446,7 @@ function Console({
     snapshot?.lineup.find(
       (entry) => entry.playerId === snapshot.currentPlayerId,
     ) ?? null;
+  const currentStartSeconds = localPlayback?.startSeconds ?? current?.startSeconds ?? 0;
   const live = snapshot?.liveTrack ?? null;
   const lineup = board?.lineup ?? snapshot?.lineup ?? [];
   return (
@@ -533,7 +534,7 @@ function Console({
                 </div>
                 <div>
                   <dt>Walk-up starts</dt>
-                  <dd>{clock(current.startSeconds)}</dd>
+                  <dd>{clock(currentStartSeconds)}</dd>
                 </div>
               </dl>
             )}
@@ -637,11 +638,15 @@ function Console({
       className={requestsOpen ? "requests-toggle requests-toggle--hidden" : "requests-toggle"}
       onClick={() => setRequestsOpen(true)}
       aria-expanded={requestsOpen}
+      aria-controls="team-requests-drawer"
+      aria-label="Open team requests"
     >
-      Team requests{requests.length ? <span className="requests-toggle__count">{requests.length}</span> : null}
+      <span className="requests-toggle__grip" aria-hidden="true" />
+      <span className="requests-toggle__label">Team requests</span>
+      {requests.length ? <span className="requests-toggle__count">{requests.length}</span> : null}
     </button>
     {requestsOpen && <div className="requests-scrim" onClick={() => setRequestsOpen(false)} aria-hidden="true" />}
-    <aside className={requestsOpen ? "requests-drawer requests-drawer--open" : "requests-drawer"} aria-hidden={!requestsOpen}>
+    <aside id="team-requests-drawer" className={requestsOpen ? "requests-drawer requests-drawer--open" : "requests-drawer"} aria-hidden={!requestsOpen}>
       <button className="requests-drawer__close" onClick={() => setRequestsOpen(false)} aria-label="Close team requests">×</button>
       <RequestChat requests={requests} reply={reply} onReplyChange={onReplyChange} onReply={onReply} onClear={onClear} enabled={operator} />
     </aside>

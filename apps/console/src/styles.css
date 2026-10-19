@@ -826,25 +826,43 @@ button:disabled {
 .requests-toggle {
   position: fixed;
   right: 0;
-  top: 96px;
+  top: 50%;
   z-index: 40;
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  border: 1px solid #ced9d8;
+  gap: 10px;
+  width: 48px;
+  min-height: 154px;
+  border: 1px solid #0c3244;
   border-right: 0;
-  border-radius: 10px 0 0 10px;
-  background: #fff;
-  color: #143f53;
+  border-radius: 16px 0 0 16px;
+  background: #143f53;
+  color: #fff;
   font-weight: 800;
   font-size: 13px;
-  padding: 11px 15px;
-  box-shadow: 0 4px 14px #153d5020;
+  padding: 14px 9px;
+  box-shadow: -5px 8px 22px #153d5038;
   cursor: pointer;
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  transform: translateY(-50%);
+  transition: transform 0.2s ease, opacity 0.2s ease, background 0.2s ease;
 }
-.requests-toggle:hover { color: #176a89; }
-.requests-toggle--hidden { transform: translateX(120%); opacity: 0; pointer-events: none; }
+.requests-toggle:hover { background: #176a89; transform: translate(-4px, -50%); }
+.requests-toggle:active { transform: translate(-2px, -50%); }
+.requests-toggle--hidden { transform: translate(120%, -50%); opacity: 0; pointer-events: none; }
+.requests-toggle__grip {
+  width: 18px;
+  height: 3px;
+  border-radius: 999px;
+  background: #9ed2dc;
+  box-shadow: 0 6px 0 #9ed2dc, 0 12px 0 #9ed2dc;
+}
+.requests-toggle__label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
 .requests-toggle__count {
   display: inline-flex;
   align-items: center;
@@ -853,10 +871,13 @@ button:disabled {
   height: 20px;
   padding: 0 6px;
   border-radius: 999px;
-  background: #176a89;
-  color: #fff;
+  background: #f2b644;
+  color: #143f53;
   font-size: 12px;
   font-weight: 800;
+  position: absolute;
+  top: 9px;
+  right: 7px;
 }
 .requests-scrim {
   position: fixed;
@@ -925,6 +946,10 @@ button:disabled {
   }
   .volume span {
     display: none;
+  }
+  .requests-toggle {
+    width: 44px;
+    min-height: 136px;
   }
 }
 .walkup-editor {
