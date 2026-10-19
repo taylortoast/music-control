@@ -51,6 +51,8 @@ download page to the production VPS after the build succeeds.
 
 In the GitHub repository, create a `production` environment and add these Actions secrets:
 
+These must be environment secrets under `production`, not repository-level secrets.
+
 | Secret | Value |
 |---|---|
 | `VPS_HOST` | VPS hostname or IP address |
