@@ -69,6 +69,22 @@ if ($failures.Count -gt 0) {
   exit 1
 }
 
+# ---------------------------------------------------------------- RE-INSTALL (upgrade in place)
+# Acceptance #4: installing over an existing install must NOT wipe it. This reproduces the class of
+# bug where a customInstall/upgrade step deletes $INSTDIR after extraction (the 0.1.14 empty-install).
+Write-Host '== Re-install over the existing install =='
+$ip2 = Start-Process -FilePath $installer.FullName -ArgumentList '/S' -Wait -PassThru
+Write-Host "re-install exit code: $($ip2.ExitCode)"
+Start-Sleep -Seconds 8
+Get-Process -Name 'Music Control' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 3
+$reFiles = if (Test-Path $dir) { (Get-ChildItem -LiteralPath $dir -Recurse -File -ErrorAction SilentlyContinue | Measure-Object).Count } else { 0 }
+Write-Host "post-reinstall -> dir:$([bool](Test-Path $dir)) files:$reFiles"
+if (-not (Test-Path $dir) -or $reFiles -eq 0) {
+  Write-Host '::error::re-install over an existing install left an EMPTY folder (the 0.1.14 bug)'
+  exit 1
+}
+
 # ---------------------------------------------------------------- UNINSTALL
 Write-Host '== Silent uninstall via the registry command =='
 if ($quiet -match '^\s*"([^"]+)"\s*(.*)$') { $uexe = $matches[1]; $uargs = $matches[2].Trim() }
