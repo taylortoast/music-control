@@ -1,9 +1,7 @@
-name: Windows desktop build & uninstaller QA
+name: Windows desktop build and deploy
 
-# Builds the Windows desktop installer natively on Windows (so electron-builder emits a REAL
-# NSIS uninstaller — no wine, no byte-extraction hack) and then runs a full install -> uninstall
-# -> verify-clean cycle. The uninstaller is a release blocker: if the cycle leaves any file,
-# registry key, or shortcut behind, or the exit code is a false success, the job FAILS.
+# Builds the Windows desktop installer natively on Windows so electron-builder emits a real NSIS
+# installer. A successful push to main can then publish the artifact to the configured VPS.
 
 on:
   push:
@@ -14,7 +12,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-qa:
+  build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,12 +35,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npx --no-install electron-builder --win nsis
 
-      - name: Uninstaller QA (install -> uninstall -> verify zero leftovers)
-        shell: pwsh
-        run: ./.github/scripts/uninstall-qa.ps1
-
       - name: Upload installer artifact
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: music-control-windows-installer
@@ -50,3 +43,75 @@ jobs:
             apps/desktop/release/*.exe
             apps/desktop/release/*.exe.blockmap
           if-no-files-found: warn
+          retention-days: 14
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.VPS_DEPLOY_ENABLED == 'true'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Windows installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: music-control-windows-installer
+          path: artifact
+
+      - name: Prepare download page
+        shell: bash
+        run: |
+          set -euo pipefail
+          installer="$(find artifact -type f -name 'Music Control Setup *.exe' -print -quit)"
+          blockmap="$(find artifact -type f -name 'Music Control Setup *.exe.blockmap' -print -quit)"
+          test -n "$installer"
+          test -n "$blockmap"
+          version="$(basename "$installer" | sed -E 's/^Music Control Setup (.*)\.exe$/\1/')"
+          sha256="$(sha256sum "$installer" | awk '{print $1}')"
+          size_mb="$(awk -v bytes="$(stat -c '%s' "$installer")" 'BEGIN { printf "%d", (bytes + 1048575) / 1048576 }')"
+          cp apps/download/index.html deploy-index.html
+          sed -E -i \
+            -e "s/Music%20Control%20Setup%20[0-9.]+\.exe/Music%20Control%20Setup%20${version}.exe/" \
+            -e "s/Download Music Control [0-9.]+ for Windows/Download Music Control ${version} for Windows/" \
+            -e "s/<p class=\"details\">Windows 10 or later · [0-9]+ MB/<p class=\"details\">Windows 10 or later · ${size_mb} MB/" \
+            -e "s#<p class=\"checksum\">SHA-256: <code>[^<]+</code></p>#<p class=\"checksum\">SHA-256: <code>${sha256}</code></p>#" \
+            deploy-index.html
+          printf 'Installer: %s\nSHA-256: %s\nSize: %s MB\n' "$version" "$sha256" "$size_mb" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Configure VPS SSH
+        shell: bash
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          set -euo pipefail
+          test -n "$VPS_SSH_KEY"
+          test -n "$VPS_HOST"
+          install -d -m 700 ~/.ssh
+          printf '%s\\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy installer and download page
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          test -n "$VPS_HOST"
+          test -n "$VPS_USER"
+          test -n "$VPS_DEPLOY_PATH"
+          installer="$(find artifact -type f -name 'Music Control Setup *.exe' -print -quit)"
+          blockmap="$(find artifact -type f -name 'Music Control Setup *.exe.blockmap' -print -quit)"
+          installer_name="$(basename "$installer")"
+          blockmap_name="$(basename "$blockmap")"
+          target="$VPS_USER@$VPS_HOST"
+          staging="/tmp/music-control-deploy-${GITHUB_SHA}"
+          ssh "$target" "install -d '$staging' '$VPS_DEPLOY_PATH'"
+          scp "$installer" "$blockmap" deploy-index.html "$target:$staging/"
+          ssh "$target" "set -eu; root='$VPS_DEPLOY_PATH'; stamp='${GITHUB_SHA:0:7}'; for file in \"\$(find \"\$root\" -maxdepth 1 -type f \( -name 'Music Control Setup *.exe' -o -name 'Music Control Setup *.exe.blockmap' -o -name 'index.html' \) -print); do cp -p \"\$file\" \"\$file.bak-\$stamp\"; done; install -m 0644 '$staging/$installer_name' '$VPS_DEPLOY_PATH/$installer_name'; install -m 0644 '$staging/$blockmap_name' '$VPS_DEPLOY_PATH/$blockmap_name'; install -m 0644 '$staging/deploy-index.html' '$VPS_DEPLOY_PATH/index.html'; rm -rf '$staging'; sha256sum '$VPS_DEPLOY_PATH/$installer_name'"

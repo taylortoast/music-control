@@ -42,3 +42,25 @@ npm run package:win --workspace=apps/desktop
 Deploy the matching Music Control server migration before enrolling a desktop. The first
 launch asks for the VPS address and administrator password once, then stores its revocable
 device credential in Windows Credential Manager.
+
+## Windows build and VPS deployment
+
+`.github/workflows/windows-desktop.yml` builds the Windows NSIS installer on every push to
+`main`, pull request, tag, or manual dispatch. A push to `main` also deploys the installer and
+download page to the production VPS after the build succeeds.
+
+In the GitHub repository, create a `production` environment and add these Actions secrets:
+
+| Secret | Value |
+|---|---|
+| `VPS_HOST` | VPS hostname or IP address |
+| `VPS_USER` | SSH deployment user; use a limited deploy user instead of `root` when possible |
+| `VPS_SSH_KEY` | Private Ed25519 key whose public key is in the user's `~/.ssh/authorized_keys` |
+| `VPS_DEPLOY_PATH` | Directory served by the download page, for example `/var/www/music-control-download` |
+
+Also create the repository variable `VPS_DEPLOY_ENABLED` with the value `true`. Keeping this
+variable off lets the Windows build run while the deployment credentials are being configured.
+
+The deployment keeps timestamped `.bak-<commit>` copies of the current installer and page before
+installing the new files. For stronger SSH host verification, replace the workflow's `ssh-keyscan`
+step with a reviewed `VPS_KNOWN_HOSTS` secret.
