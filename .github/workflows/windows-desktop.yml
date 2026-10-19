@@ -28,7 +28,7 @@ jobs:
         run: npm ci
 
       - name: Build desktop renderer + main process
-        run: npm run build --workspace=@music-control-v2/desktop
+        run: npm run build --workspace=apps/desktop
 
       - name: Package Windows installer (NSIS)
         working-directory: apps/desktop

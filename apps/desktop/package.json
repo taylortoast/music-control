@@ -1,7 +1,7 @@
 {
-  "name": "@music-control-v2/desktop",
+  "name": "music-control",
   "private": true,
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "Local-first Windows music operator console",
   "author": "Music Control",
   "type": "module",

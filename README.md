@@ -36,7 +36,7 @@ downloads, and an explicit streaming fallback. Build the installer with:
 
 ```bash
 npm install
-npm run package:win --workspace=@music-control-v2/desktop
+npm run package:win --workspace=apps/desktop
 ```
 
 Deploy the matching Music Control server migration before enrolling a desktop. The first

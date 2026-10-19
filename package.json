@@ -7,9 +7,9 @@
     "dev:console": "npm run dev --workspace=@music-control-v2/console",
     "dev:lineup": "npm run dev --workspace=@music-control-v2/lineup-board",
     "dev:upload": "npm run dev --workspace=@music-control-v2/library-upload",
-    "dev:desktop": "npm run dev --workspace=@music-control-v2/desktop",
+    "dev:desktop": "npm run dev --workspace=apps/desktop",
     "dev:requests": "npm run dev --workspace=@music-control-v2/music-requests",
-    "build": "npm run build --workspace=@music-control-v2/console && npm run build --workspace=@music-control-v2/lineup-board && npm run build --workspace=@music-control-v2/library-upload && npm run build --workspace=@music-control-v2/music-requests && npm run build --workspace=@music-control-v2/desktop",
+    "build": "npm run build --workspace=@music-control-v2/console && npm run build --workspace=@music-control-v2/lineup-board && npm run build --workspace=@music-control-v2/library-upload && npm run build --workspace=@music-control-v2/music-requests && npm run build --workspace=apps/desktop",
     "test": "vitest run"
   },
   "devDependencies": {

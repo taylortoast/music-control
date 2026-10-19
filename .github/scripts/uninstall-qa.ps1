@@ -20,8 +20,8 @@ if (-not $installer) { Write-Host '::error::No installer .exe found in apps/desk
 Write-Host "Installer under test: $($installer.FullName)"
 
 $key     = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\94c70cc2-4cd1-5799-8571-e04348f0e736'
-$appData = Join-Path $env:APPDATA '@music-control-v2'
-$updater = Join-Path $env:LOCALAPPDATA '@music-control-v2desktop-updater'
+$appData = Join-Path $env:APPDATA 'music-control'
+$updater = Join-Path $env:LOCALAPPDATA 'music-control-updater'
 $smLnk   = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Music Control.lnk'
 $dtLnk   = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Music Control.lnk'
 
