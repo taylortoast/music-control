@@ -898,7 +898,11 @@ function Setup({
   const selected =
     board?.lineup.find((entry) => entry.playerId === playerId) ?? null;
   useEffect(() => {
-    if (!playerId && board?.lineup[0]) setPlayerId(board.lineup[0].playerId);
+    if (!playerId && board?.lineup[0]) {
+      const first = board.lineup[0];
+      setPlayerId(first.playerId);
+      setStart(clock(first.startSeconds));
+    }
   }, [board, playerId]);
   const assign = async (trackId: number | null) => {
     if (!operator || !playerId) return;
@@ -1340,7 +1344,15 @@ function LocalOnlySetup({ board, operator, alert, onRefresh, onLocalRefresh, onL
   }, [operator, alert, onLocalRefresh]);
   useEffect(() => { void desktop.status().then(status => setFolder(status?.libraryRoot ?? null)); void api.localLibrary().then(apply).catch(() => undefined); }, []);
   useEffect(() => { void sync(); }, [sync]);
-  useEffect(() => { if (!playerId && board?.lineup[0]) setPlayerId(board.lineup[0].playerId); }, [board, playerId]);
+  useEffect(() => {
+    if (!playerId && board?.lineup[0]) {
+      const first = board.lineup[0];
+      const firstAssignment = library.players.find((item) => item.playerId === first.playerId);
+      setPlayerId(first.playerId);
+      setSelectedKey(firstAssignment?.contentKey ?? "");
+      setStart(clock(firstAssignment?.startSeconds ?? 0));
+    }
+  }, [board, library.players, playerId]);
   const assign = async () => { const seconds=parseClock(start); if (!playerId || !selectedKey || seconds===null) return alert("Choose a player, local track, and valid start time."); try { await api.assignLocalPlayer(playerId,selectedKey,seconds); const updated=await api.localLibrary(); apply(updated); await onRefresh(); } catch(error) { alert(error instanceof Error?error.message:"Could not assign local music."); } };
   const addCue = async () => { const seconds=parseClock(start); if(!name.trim()||!selectedKey||seconds===null)return alert("Choose a name, local track, and valid start time."); try { await api.createLocalCue(name.trim(),selectedKey,seconds); apply(await api.localLibrary()); setName(""); } catch(error){alert(error instanceof Error?error.message:"Could not save situation music.");} };
   const visible = library.tracks.filter(track => track.available && `${track.title ?? ""} ${track.fileName} ${track.artist ?? ""}`.toLowerCase().includes(query.toLowerCase()));
@@ -1370,7 +1382,12 @@ function LocalOnlySetup({ board, operator, alert, onRefresh, onLocalRefresh, onL
                     <li key={player.playerId}>
                       <button
                         className={playerId === player.playerId ? "player-picker__item player-picker__item--active" : "player-picker__item"}
-                        onClick={() => setPlayerId(player.playerId)}
+                        onClick={() => {
+                          const nextAssignment = library.players.find((item) => item.playerId === player.playerId);
+                          setPlayerId(player.playerId);
+                          setSelectedKey(nextAssignment?.contentKey ?? "");
+                          setStart(clock(nextAssignment?.startSeconds ?? 0));
+                        }}
                       >
                         <strong>{player.displayName}{player.number ? ` #${player.number}` : ""}</strong>
                         <span>{playerAssignment ? trackName(playerAssignment.contentKey) : "No walk-up music"}</span>
