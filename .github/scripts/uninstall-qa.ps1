@@ -5,9 +5,11 @@
     install silently  ->  confirm it really installed  ->  uninstall via the registry's
     QuietUninstallString  ->  confirm EVERYTHING is gone and the exit code is honest.
 
-  Exits non-zero (fails the CI job) if any acceptance item fails. This is the release gate
-  that previous Linux-built uninstallers (0.1.6 hung, 0.1.8 exit-0-removed-nothing, 0.1.9
-  exit-2-removed-nothing) would have tripped.
+  The install location and uninstall command are read FROM THE REGISTRY (not guessed), because
+  electron-builder's install folder name is derived from the app name, not always the productName.
+
+  Exits non-zero (fails the CI job) if any acceptance item fails. This is the release gate that
+  previous Linux-built uninstallers (0.1.6 hung, 0.1.8 exit-0-removed-nothing, 0.1.9 exit-2) trip.
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -17,8 +19,6 @@ $installer = Get-ChildItem 'apps\desktop\release\Music Control Setup *.exe' |
 if (-not $installer) { Write-Host '::error::No installer .exe found in apps/desktop/release'; exit 1 }
 Write-Host "Installer under test: $($installer.FullName)"
 
-# Paths the acceptance criteria require to be created on install and removed on uninstall.
-$dir     = Join-Path $env:LOCALAPPDATA 'Programs\Music Control'
 $key     = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\94c70cc2-4cd1-5799-8571-e04348f0e736'
 $appData = Join-Path $env:APPDATA '@music-control-v2'
 $updater = Join-Path $env:LOCALAPPDATA '@music-control-v2desktop-updater'
@@ -37,10 +37,26 @@ Start-Sleep -Seconds 8
 Get-Process -Name 'Music Control' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 3
 
-$installedFiles = if (Test-Path $dir) { (Get-ChildItem -LiteralPath $dir -Recurse -File -ErrorAction SilentlyContinue | Measure-Object).Count } else { 0 }
-Write-Host "post-install -> dir:$([bool](Test-Path $dir)) files:$installedFiles regKey:$([bool](Test-Path $key))"
-if (-not (Test-Path $dir) -or $installedFiles -eq 0) { $failures.Add("install produced no files in $dir") }
-if (-not (Test-Path $key)) { $failures.Add('install did not create the uninstall registry key') }
+if (-not (Test-Path $key)) {
+  Write-Host '::error::install did not create the uninstall registry key - cannot continue'
+  exit 1
+}
+
+# Read the REAL install location + uninstall commands straight from the registry.
+$props = Get-ItemProperty -Path $key
+$dir   = $props.InstallLocation
+$quiet = $props.QuietUninstallString
+if (-not $quiet) { $quiet = $props.UninstallString }
+Write-Host "registry DisplayName         : $($props.DisplayName)"
+Write-Host "registry InstallLocation     : $dir"
+Write-Host "registry QuietUninstallString: $quiet"
+
+if (-not $dir)   { $failures.Add('registry has no InstallLocation value') }
+if (-not $quiet) { $failures.Add('registry has no (Quiet)UninstallString') }
+
+$installedFiles = if ($dir -and (Test-Path $dir)) { (Get-ChildItem -LiteralPath $dir -Recurse -File -ErrorAction SilentlyContinue | Measure-Object).Count } else { 0 }
+Write-Host "post-install -> dir:$([bool]($dir -and (Test-Path $dir))) files:$installedFiles"
+if (-not $dir -or -not (Test-Path $dir) -or $installedFiles -eq 0) { $failures.Add("install produced no files in '$dir'") }
 
 if ($failures.Count -gt 0) {
   Write-Host '::error::Install step failed, cannot test uninstall:'
@@ -48,14 +64,12 @@ if ($failures.Count -gt 0) {
   exit 1
 }
 
-$quiet = (Get-ItemProperty -Path $key).QuietUninstallString
-Write-Host "QuietUninstallString: $quiet"
-if (-not $quiet) { Write-Host '::error::no QuietUninstallString in registry'; exit 1 }
-
 # ---------------------------------------------------------------- UNINSTALL
-Write-Host '== Silent uninstall via QuietUninstallString =='
+Write-Host '== Silent uninstall via the registry command =='
 if ($quiet -match '^\s*"([^"]+)"\s*(.*)$') { $uexe = $matches[1]; $uargs = $matches[2].Trim() }
 else { $p = $quiet -split ' ', 2; $uexe = $p[0]; $uargs = if ($p.Count -gt 1) { $p[1] } else { '' } }
+# Ensure a silent uninstall even if only the non-quiet UninstallString was available.
+if ($uargs -notmatch '(?i)/S(\s|$)') { $uargs = ($uargs + ' /S').Trim() }
 Write-Host "uninstaller exe : $uexe"
 Write-Host "uninstaller args: $uargs"
 
@@ -83,8 +97,8 @@ Write-Host "post-uninstall leftovers -> dir:$leftDir key:$leftKey appData:$leftA
 
 if ($leftDir)     { $failures.Add("install directory still present: $dir") }
 if ($leftKey)     { $failures.Add('uninstall registry key still present') }
-if ($leftAppData) { $failures.Add('%APPDATA%\@music-control-v2 still present') }
-if ($leftUpdater) { $failures.Add('%LOCALAPPDATA%\@music-control-v2desktop-updater still present') }
+if ($leftAppData) { $failures.Add("$appData still present") }
+if ($leftUpdater) { $failures.Add("$updater still present") }
 if ($leftSm)      { $failures.Add('Start Menu shortcut still present') }
 if ($leftDt)      { $failures.Add('Desktop shortcut still present') }
 if ($hung -gt 0)  { $failures.Add("$hung uninstaller/app process(es) left running (hung)") }
