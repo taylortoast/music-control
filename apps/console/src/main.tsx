@@ -31,7 +31,7 @@ import "./styles.css";
 import "./walkup-tracks.css";
 
 type View = "console" | "setup";
-type LocalPlayback = { media: LocalMedia; startSeconds: number; label: string; autoPlay?: boolean };
+type LocalPlayback = { media: LocalMedia; startSeconds: number; label: string };
 const emptyAuth: AuthState = {
   authenticated: false,
   setupRequired: false,
@@ -332,22 +332,30 @@ function App() {
           onTransport={(verb) =>
             snapshot && void command(() => api.live(snapshot.sessionId, verb))
           }
-          onCue={(cue) =>
-            snapshot &&
-            void command(() => api.fireCue(snapshot.sessionId, cue.cueId))
-          }
+          onCue={(cue) => {
+            setLocalPlayback(null);
+            if (snapshot) void command(() => api.fireCue(snapshot.sessionId, cue.cueId));
+          }}
           localMedia={localMedia}
           localAssignments={localAssignments}
           localLibrary={localLibrary}
           localPlayback={localPlayback}
           onLocalCue={(situation) => {
             const media = localMedia.find((item) => item.mediaId === situation.mediaId);
-            if (media) setLocalPlayback({ media, startSeconds: situation.startSeconds, label: situation.name, autoPlay: true });
+            if (!media) return null;
+            const playback = { media, startSeconds: situation.startSeconds, label: situation.name };
+            setLocalPlayback(playback);
+            return playback;
           }}
           onLocalCatalogCue={(cue) => {
             const media = localMedia.find((item) => item.contentKey === cue.contentKey);
-            if (media) setLocalPlayback({ media, startSeconds: cue.startSeconds, label: cue.name, autoPlay: true });
-            else setNotice(`${cue.name}'s file is not available on this desktop.`);
+            if (!media) {
+              setNotice(`${cue.name}'s file is not available on this desktop.`);
+              return null;
+            }
+            const playback = { media, startSeconds: cue.startSeconds, label: cue.name };
+            setLocalPlayback(playback);
+            return playback;
           }}
           onPlayback={(report) => realtime.current?.reportPlayback(report)}
           requests={requests}
@@ -429,8 +437,8 @@ function Console({
   localAssignments: LocalAssignments;
   localLibrary: LocalLibraryState;
   localPlayback: LocalPlayback | null;
-  onLocalCue: (situation: LocalAssignments["situations"][number]) => void;
-  onLocalCatalogCue: (cue: LocalLibraryState["cues"][number]) => void;
+  onLocalCue: (situation: LocalAssignments["situations"][number]) => LocalPlayback | null;
+  onLocalCatalogCue: (cue: LocalLibraryState["cues"][number]) => LocalPlayback | null;
   requests: RequestMessage[];
   reply: string;
   onReplyChange: (value: string) => void;
@@ -603,7 +611,7 @@ function Console({
           </div>
           <div className="moments__grid">
             {localAssignments.situations.map((situation) => (
-              <button key={`local-${situation.situationId}`} disabled={!operator || !localMedia.some((item) => item.mediaId === situation.mediaId)} onClick={() => onLocalCue(situation)}>
+              <button key={`local-${situation.situationId}`} disabled={!operator || !localMedia.some((item) => item.mediaId === situation.mediaId)} onClick={() => { const playback = onLocalCue(situation); if (playback) localAudio.playFrom(playback); }}>
                 <strong>{situation.name}</strong><small>Local only · {localMedia.find((item) => item.mediaId === situation.mediaId)?.fileName ?? "File missing"}</small>
               </button>
             ))}
@@ -611,7 +619,7 @@ function Console({
               <button
                 key={cue.cueId}
                 disabled={!operator || cue.trackId === null || cue.trackMissing}
-                onClick={() => onCue(cue)}
+                onClick={() => { if (cue.trackId !== null) audio.playCue(cue.trackId, cue.startSeconds); onCue(cue); }}
               >
                 <strong>{cue.name}</strong>
                 <small>
@@ -625,7 +633,7 @@ function Console({
             ))}
             {localLibrary.cues.map((cue) => {
               const track = localLibrary.tracks.find((item) => item.contentKey === cue.contentKey);
-              return <button key={`local-${cue.cueId}`} disabled={!operator || !track?.available || !localMedia.some((item) => item.contentKey === cue.contentKey)} onClick={() => onLocalCatalogCue(cue)}><strong>{cue.name}</strong><small>{track?.title ?? "Local file unavailable"}</small></button>;
+              return <button key={`local-${cue.cueId}`} disabled={!operator || !track?.available || !localMedia.some((item) => item.contentKey === cue.contentKey)} onClick={() => { const playback = onLocalCatalogCue(cue); if (playback) localAudio.playFrom(playback); }}><strong>{cue.name}</strong><small>{track?.title ?? "Local file unavailable"}</small></button>;
             })}
           </div>
           {snapshot && snapshot.cues.length === 0 && (
@@ -787,6 +795,27 @@ function useLiveAudio(
       localStorage.setItem("music-control-v2.live-volume", String(safe));
       if (element.current) element.current.volume = safe;
     },
+    playCue: (trackId: number, startSeconds: number) => {
+      const audio = element.current ?? new Audio();
+      element.current = audio;
+      const target = Math.max(0, startSeconds);
+      const seek = () => {
+        try {
+          if (target > 0 && Math.abs(audio.currentTime - target) > 0.25) audio.currentTime = target;
+        } catch { /* not seekable yet */ }
+      };
+      const ready = () => {
+        seek();
+        audio.removeEventListener("loadedmetadata", ready);
+        audio.removeEventListener("canplay", ready);
+      };
+      audio.src = `${api.audioUrl(trackId)}${target > 0 ? `#t=${target}` : ""}`;
+      audio.volume = volume;
+      audio.addEventListener("loadedmetadata", ready);
+      audio.addEventListener("canplay", ready);
+      seek();
+      void audio.play().catch(() => undefined);
+    },
   };
 }
 
@@ -806,12 +835,10 @@ function useLocalAudio(playback: LocalPlayback | null, enabled: boolean) {
     // (readyState 0) is a no-op, which made the Start-at offset start playback at 0. Seek when
     // metadata loads, and again on canplay, until the element is actually at the target.
     const seek = () => { try { if (target > 0 && Math.abs(audio.currentTime - target) > 0.25) audio.currentTime = target; } catch { /* not seekable yet */ } };
-    const startPlayback = () => { seek(); if (playback.autoPlay) void audio.play().catch(() => undefined); };
-    audio.addEventListener("loadedmetadata", startPlayback);
-    audio.addEventListener("canplay", startPlayback);
+    audio.addEventListener("loadedmetadata", seek);
+    audio.addEventListener("canplay", seek);
     seek();
-    if (playback.autoPlay && audio.readyState >= 1) startPlayback();
-    return () => { audio.pause(); audio.removeEventListener("loadedmetadata", startPlayback); audio.removeEventListener("canplay", startPlayback); };
+    return () => { audio.pause(); audio.removeEventListener("loadedmetadata", seek); audio.removeEventListener("canplay", seek); };
   }, [enabled, playback]);
   useEffect(() => {
     const audio = element.current ?? new Audio(); element.current = audio;
@@ -822,6 +849,27 @@ function useLocalAudio(playback: LocalPlayback | null, enabled: boolean) {
   return {
     position, duration, progress: duration ? Math.min(100, (position / duration) * 100) : 0, volume,
     setVolume: (value: number) => { const safe = Math.max(0, Math.min(1, value)); setVolumeState(safe); if (element.current) element.current.volume = safe; },
+    playFrom: (next: LocalPlayback) => {
+      const audio = element.current ?? new Audio();
+      element.current = audio;
+      const target = Math.max(0, next.startSeconds);
+      const seek = () => {
+        try {
+          if (target > 0 && Math.abs(audio.currentTime - target) > 0.25) audio.currentTime = target;
+        } catch { /* not seekable yet */ }
+      };
+      const ready = () => {
+        seek();
+        audio.removeEventListener("loadedmetadata", ready);
+        audio.removeEventListener("canplay", ready);
+      };
+      audio.src = `${desktop.localMediaUrl(next.media.mediaId)}#t=${target}`;
+      audio.volume = volume;
+      audio.addEventListener("loadedmetadata", ready);
+      audio.addEventListener("canplay", ready);
+      seek();
+      void audio.play().catch(() => undefined);
+    },
     play: () => element.current?.play(), pause: () => element.current?.pause(), stop: () => { if (element.current) { element.current.pause(); element.current.currentTime = playback?.startSeconds ?? 0; } },
   };
 }
