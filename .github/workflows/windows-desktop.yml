@@ -120,13 +120,15 @@ jobs:
           staging="/tmp/music-control-deploy-${GITHUB_SHA}"
           ssh "$target" "install -d '$staging' '$VPS_DEPLOY_PATH'"
           scp "$installer" "$blockmap" deploy-index.html "$target:$staging/"
-          ssh "$target" bash -s -- "$VPS_DEPLOY_PATH" "$staging" "$installer_name" "$blockmap_name" "${GITHUB_SHA:0:7}" <<'REMOTE'
+          ssh "$target" bash -s -- "$VPS_DEPLOY_PATH" "$staging" "${GITHUB_SHA:0:7}" <<'REMOTE'
           set -eu
           root="$1"
           staging="$2"
-          installer_name="$3"
-          blockmap_name="$4"
-          stamp="$5"
+          stamp="$3"
+          installer="$(find "$staging" -maxdepth 1 -type f -name 'Music Control Setup *.exe' -print -quit)"
+          blockmap="$(find "$staging" -maxdepth 1 -type f -name 'Music Control Setup *.exe.blockmap' -print -quit)"
+          installer_name="$(basename "$installer")"
+          blockmap_name="$(basename "$blockmap")"
           find "$root" -maxdepth 1 -type f \( -name 'Music Control Setup *.exe' -o -name 'Music Control Setup *.exe.blockmap' -o -name 'index.html' \) -print0 |
             while IFS= read -r -d '' file; do cp -p "$file" "$file.bak-$stamp"; done
           install -m 0644 "$staging/$installer_name" "$root/$installer_name"
