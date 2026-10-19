@@ -42,17 +42,22 @@ if (-not (Test-Path $key)) {
   exit 1
 }
 
-# Read the REAL install location + uninstall commands straight from the registry.
+# Read the REAL uninstall command from the registry, and derive the install directory from the
+# uninstaller's own location (electron-builder does not write an InstallLocation value, and the
+# folder is named from the scoped package name, not productName).
 $props = Get-ItemProperty -Path $key
-$dir   = $props.InstallLocation
 $quiet = $props.QuietUninstallString
 if (-not $quiet) { $quiet = $props.UninstallString }
+if ($quiet -match '^\s*"([^"]+)"\s*(.*)$') { $uexe = $matches[1]; $uargs = $matches[2].Trim() }
+elseif ($quiet)                            { $p = $quiet -split ' ', 2; $uexe = $p[0]; $uargs = if ($p.Count -gt 1) { $p[1] } else { '' } }
+$dir = $props.InstallLocation
+if ((-not $dir) -and $uexe) { $dir = Split-Path -Parent $uexe }
 Write-Host "registry DisplayName         : $($props.DisplayName)"
-Write-Host "registry InstallLocation     : $dir"
 Write-Host "registry QuietUninstallString: $quiet"
+Write-Host "derived install directory    : $dir"
 
-if (-not $dir)   { $failures.Add('registry has no InstallLocation value') }
 if (-not $quiet) { $failures.Add('registry has no (Quiet)UninstallString') }
+if (-not $dir)   { $failures.Add('could not determine install directory') }
 
 $installedFiles = if ($dir -and (Test-Path $dir)) { (Get-ChildItem -LiteralPath $dir -Recurse -File -ErrorAction SilentlyContinue | Measure-Object).Count } else { 0 }
 Write-Host "post-install -> dir:$([bool]($dir -and (Test-Path $dir))) files:$installedFiles"
