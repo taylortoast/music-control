@@ -498,8 +498,7 @@ button:disabled {
   .player-picker { max-height: 240px; }
 }
 @media (min-width: 861px) {
-  /* The three-column panel manages its own scroll; don't let the fixed-height
-     setup shell clip the "remove VPS music" footer. */
+  /* The three-column panel manages its own scroll. */
   .setup.local-setup { overflow: auto; }
 }
 .panel {

@@ -31,7 +31,7 @@ import "./styles.css";
 import "./walkup-tracks.css";
 
 type View = "console" | "setup";
-type LocalPlayback = { media: LocalMedia; startSeconds: number; label: string };
+type LocalPlayback = { media: LocalMedia; startSeconds: number; label: string; autoPlay?: boolean };
 const emptyAuth: AuthState = {
   authenticated: false,
   setupRequired: false,
@@ -342,11 +342,11 @@ function App() {
           localPlayback={localPlayback}
           onLocalCue={(situation) => {
             const media = localMedia.find((item) => item.mediaId === situation.mediaId);
-            if (media) setLocalPlayback({ media, startSeconds: situation.startSeconds, label: situation.name });
+            if (media) setLocalPlayback({ media, startSeconds: situation.startSeconds, label: situation.name, autoPlay: true });
           }}
           onLocalCatalogCue={(cue) => {
             const media = localMedia.find((item) => item.contentKey === cue.contentKey);
-            if (media) setLocalPlayback({ media, startSeconds: cue.startSeconds, label: cue.name });
+            if (media) setLocalPlayback({ media, startSeconds: cue.startSeconds, label: cue.name, autoPlay: true });
             else setNotice(`${cue.name}'s file is not available on this desktop.`);
           }}
           onPlayback={(report) => realtime.current?.reportPlayback(report)}
@@ -718,7 +718,16 @@ function useLiveAudio(
         positionSeconds: audio.currentTime,
         ...(message ? { message } : {}),
       });
-    const loaded = () => send("loaded");
+    const seek = () => {
+      try {
+        if (start > 0 && Math.abs(audio.currentTime - start) > 0.25) audio.currentTime = start;
+      } catch { /* not seekable yet */ }
+    };
+    const play = () => {
+      seek();
+      if (snapshot.livePlaybackState === "playing") void audio.play().catch((error: Error) => send("playback-error", error.message));
+    };
+    const loaded = () => { seek(); send("loaded"); play(); };
     const playing = () => send("playing");
     const paused = () => send("paused");
     const ended = () => send("ended");
@@ -728,6 +737,7 @@ function useLiveAudio(
         `media error ${audio.error?.code ?? "unknown"}`,
       );
     audio.addEventListener("loadedmetadata", loaded);
+    audio.addEventListener("canplay", play);
     audio.addEventListener("playing", playing);
     audio.addEventListener("pause", paused);
     audio.addEventListener("ended", ended);
@@ -737,16 +747,15 @@ function useLiveAudio(
       audio.src = url;
       audio.currentTime = start;
     }
-    if (snapshot.livePlaybackState === "playing")
-      void audio
-        .play()
-        .catch((error: Error) => send("playback-error", error.message));
-    else {
+    if (snapshot.livePlaybackState === "playing") {
+      if (audio.readyState >= 1) play();
+    } else {
       audio.pause();
       if (snapshot.livePlaybackState === "stopped") audio.currentTime = start;
     }
     return () => {
       audio.removeEventListener("loadedmetadata", loaded);
+      audio.removeEventListener("canplay", play);
       audio.removeEventListener("playing", playing);
       audio.removeEventListener("pause", paused);
       audio.removeEventListener("ended", ended);
@@ -797,10 +806,12 @@ function useLocalAudio(playback: LocalPlayback | null, enabled: boolean) {
     // (readyState 0) is a no-op, which made the Start-at offset start playback at 0. Seek when
     // metadata loads, and again on canplay, until the element is actually at the target.
     const seek = () => { try { if (target > 0 && Math.abs(audio.currentTime - target) > 0.25) audio.currentTime = target; } catch { /* not seekable yet */ } };
-    audio.addEventListener("loadedmetadata", seek);
-    audio.addEventListener("canplay", seek);
+    const startPlayback = () => { seek(); if (playback.autoPlay) void audio.play().catch(() => undefined); };
+    audio.addEventListener("loadedmetadata", startPlayback);
+    audio.addEventListener("canplay", startPlayback);
     seek();
-    return () => { audio.pause(); audio.removeEventListener("loadedmetadata", seek); audio.removeEventListener("canplay", seek); };
+    if (playback.autoPlay && audio.readyState >= 1) startPlayback();
+    return () => { audio.pause(); audio.removeEventListener("loadedmetadata", startPlayback); audio.removeEventListener("canplay", startPlayback); };
   }, [enabled, playback]);
   useEffect(() => {
     const audio = element.current ?? new Audio(); element.current = audio;
@@ -1435,7 +1446,6 @@ function LocalOnlySetup({ board, operator, alert, onRefresh, onLocalRefresh, onL
             </div>
           </div>
         )}
-        <p className="library-folder-note">After verifying these assignments, <button className="quiet" disabled={!operator || library.tracks.length === 0} onClick={() => { if (confirm("Permanently remove every audio file from the VPS? Local files will be unaffected.")) void api.purgeVpsLibrary().then(result => alert(`Removed ${result.removed} VPS tracks.`)).catch(error => alert(error.message)); }}>remove VPS music</button></p>
       </section>
     </section>
   );

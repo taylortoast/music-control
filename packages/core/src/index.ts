@@ -322,7 +322,6 @@ export const api = {
   clearLocalPlayer: (playerId: number) => request("DELETE", `/api/local-library/players/${playerId}`),
   createLocalCue: (name: string, contentKey: string, startSeconds: number) => request<LocalCue>("POST", "/api/local-library/cues", { name, contentKey, startSeconds }),
   deleteLocalCue: (cueId: number) => request("DELETE", `/api/local-library/cues/${cueId}`),
-  purgeVpsLibrary: () => request<{ removed: number }>("POST", "/api/local-library/purge-vps"),
 };
 export function clock(seconds: number | null | undefined): string {
   const total = Math.max(0, Math.floor(seconds ?? 0));
