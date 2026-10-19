@@ -1,0 +1,36 @@
+{
+  "name": "@music-control-v2/desktop",
+  "private": true,
+  "version": "0.1.13",
+  "description": "Local-first Windows music operator console",
+  "author": "Music Control",
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && electron .\"",
+    "build": "tsc -p tsconfig.electron.json && node -e \"require('node:fs').writeFileSync('dist-electron/package.json', JSON.stringify({ type: 'commonjs' }))\" && vite build",
+    "package:win": "npm run build && electron-builder --win nsis"
+  },
+  "dependencies": {
+    "@music-control-v2/core": "*",
+    "jsmediatags": "^3.9.7",
+    "keytar": "^7.9.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.2",
+    "concurrently": "^9.1.2",
+    "electron": "35.7.5",
+    "electron-builder": "^26.0.12",
+    "wait-on": "^8.0.2"
+  },
+  "build": {
+    "appId": "tech.taylortoast.music-control",
+    "productName": "Music Control",
+    "directories": { "output": "release" },
+    "files": ["dist/**", "dist-electron/**", "package.json"],
+    "win": { "target": "nsis" },
+    "nsis": { "deleteAppDataOnUninstall": true }
+  }
+}

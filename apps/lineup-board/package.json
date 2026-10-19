@@ -1,0 +1,9 @@
+{
+  "name": "@music-control-v2/lineup-board",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": { "dev": "vite", "build": "tsc --noEmit && vite build" },
+  "dependencies": { "@music-control-v2/core": "*", "react": "^19.1.0", "react-dom": "^19.1.0" },
+  "devDependencies": {}
+}

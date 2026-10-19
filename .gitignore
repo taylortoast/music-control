@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+dist-electron/
+release/
+*.tsbuildinfo
+
+# Logs / OS cruft
+*.log
+.DS_Store
+Thumbs.db
+
+# Local env / secrets (never commit)
+.env
+.env.*
+*.pem
+*.key
+
+# Editor
+.vscode/
+.idea/
+
+# Test / coverage
+coverage/

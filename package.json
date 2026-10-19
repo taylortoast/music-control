@@ -1,0 +1,24 @@
+{
+  "name": "music-control-v2",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev:console": "npm run dev --workspace=@music-control-v2/console",
+    "dev:lineup": "npm run dev --workspace=@music-control-v2/lineup-board",
+    "dev:upload": "npm run dev --workspace=@music-control-v2/library-upload",
+    "dev:desktop": "npm run dev --workspace=@music-control-v2/desktop",
+    "dev:requests": "npm run dev --workspace=@music-control-v2/music-requests",
+    "build": "npm run build --workspace=@music-control-v2/console && npm run build --workspace=@music-control-v2/lineup-board && npm run build --workspace=@music-control-v2/library-upload && npm run build --workspace=@music-control-v2/music-requests && npm run build --workspace=@music-control-v2/desktop",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^4.4.1",
+    "jsdom": "^26.0.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.1.2"
+  }
+}

@@ -1,0 +1,52 @@
+name: Windows desktop build & uninstaller QA
+
+# Builds the Windows desktop installer natively on Windows (so electron-builder emits a REAL
+# NSIS uninstaller — no wine, no byte-extraction hack) and then runs a full install -> uninstall
+# -> verify-clean cycle. The uninstaller is a release blocker: if the cycle leaves any file,
+# registry key, or shortcut behind, or the exit code is a false success, the job FAILS.
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*', 'desktop-v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-qa:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build desktop renderer + main process
+        run: npm run build --workspace=@music-control-v2/desktop
+
+      - name: Package Windows installer (NSIS)
+        working-directory: apps/desktop
+        env:
+          # No code-signing cert in CI; skip auto-discovery so the build does not fail.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx --no-install electron-builder --win nsis
+
+      - name: Uninstaller QA (install -> uninstall -> verify zero leftovers)
+        shell: pwsh
+        run: ./.github/scripts/uninstall-qa.ps1
+
+      - name: Upload installer artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: music-control-windows-installer
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.exe.blockmap
+          if-no-files-found: warn

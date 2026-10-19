@@ -1,0 +1,8 @@
+{
+  "name": "@music-control-v2/music-requests",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": { "dev": "vite", "build": "tsc -p tsconfig.json && vite build" },
+  "dependencies": { "@music-control-v2/core": "0.1.0", "@vitejs/plugin-react": "^4.4.1", "vite": "^6.3.5", "typescript": "^5.8.3", "react": "^19.1.0", "react-dom": "^19.1.0" },
+  "devDependencies": { "@types/react": "^19.1.0", "@types/react-dom": "^19.1.0" }
+}
