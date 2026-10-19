@@ -113,17 +113,23 @@ async function localMedia(): Promise<Array<LocalMedia & { path: string }>> {
   return found.sort((a, b) => a.fileName.localeCompare(b.fileName));
 }
 
-function registerProtocols() { protocol.handle("music-control", async request => {
+function registerProtocols() { // Forward the audio element's Range header so <audio> can seek to a start offset within the file
+// (a plain full-body response makes forward seeks into unbuffered audio unreliable).
+const fetchFile = (filePath: string, request: Request) => {
+  const range = request.headers.get("Range");
+  return net.fetch(pathToFileURL(filePath).toString(), range ? { headers: { Range: range } } : undefined);
+};
+protocol.handle("music-control", async request => {
   const id = Number(new URL(request.url).hostname);
   const entry = (await cache()).find(value => value.trackId === id);
   if (!entry) return new Response("Not found", { status: 404 });
-  return net.fetch(pathToFileURL(entry.path).toString());
+  return fetchFile(entry.path, request);
 });
 protocol.handle("music-control-local", async request => {
   const mediaId = new URL(request.url).hostname;
   const entry = (await localMedia()).find(value => value.mediaId === mediaId);
   if (!entry) return new Response("Not found", { status: 404 });
-  return net.fetch(pathToFileURL(entry.path).toString());
+  return fetchFile(entry.path, request);
 });
 protocol.handle("music-control-stream", async request => {
   const id = Number(new URL(request.url).hostname);

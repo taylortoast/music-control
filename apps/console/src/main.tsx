@@ -785,10 +785,17 @@ function useLocalAudio(playback: LocalPlayback | null, enabled: boolean) {
     const audio = element.current ?? new Audio();
     element.current = audio;
     if (!enabled || !playback) { audio.pause(); audio.removeAttribute("src"); return; }
-    audio.src = `${desktop.localMediaUrl(playback.media.mediaId)}#t=${playback.startSeconds}`;
-    audio.currentTime = playback.startSeconds;
+    const target = playback.startSeconds || 0;
+    audio.src = `${desktop.localMediaUrl(playback.media.mediaId)}#t=${target}`;
     audio.volume = volume;
-    return () => audio.pause();
+    // currentTime can only be applied once the media is seekable; setting it right after src
+    // (readyState 0) is a no-op, which made the Start-at offset start playback at 0. Seek when
+    // metadata loads, and again on canplay, until the element is actually at the target.
+    const seek = () => { try { if (target > 0 && Math.abs(audio.currentTime - target) > 0.25) audio.currentTime = target; } catch { /* not seekable yet */ } };
+    audio.addEventListener("loadedmetadata", seek);
+    audio.addEventListener("canplay", seek);
+    seek();
+    return () => { audio.pause(); audio.removeEventListener("loadedmetadata", seek); audio.removeEventListener("canplay", seek); };
   }, [enabled, playback]);
   useEffect(() => {
     const audio = element.current ?? new Audio(); element.current = audio;
