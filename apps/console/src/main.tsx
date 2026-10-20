@@ -827,7 +827,22 @@ function useLocalAudio(playback: LocalPlayback | null, enabled: boolean) {
   useEffect(() => {
     const audio = element.current ?? new Audio();
     element.current = audio;
-    if (!enabled || !playback) { audio.pause(); audio.removeAttribute("src"); }
+    if (!enabled || !playback) {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+      return;
+    }
+    const target = Math.max(0, playback.startSeconds);
+    const source = `${desktop.localMediaUrl(playback.media.mediaId)}#t=${target}`;
+    // Player selection must load the media before the transport's Play action.
+    // A situation button may already have started this source through playFrom.
+    if (audio.getAttribute("src") !== source) {
+      audio.pause();
+      audio.src = source;
+      audio.volume = volume;
+      audio.load();
+    }
   }, [enabled, playback]);
   useEffect(() => {
     const audio = element.current ?? new Audio(); element.current = audio;
