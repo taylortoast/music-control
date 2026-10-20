@@ -838,10 +838,27 @@ function useLocalAudio(playback: LocalPlayback | null, enabled: boolean) {
     // Player selection must load the media before the transport's Play action.
     // A situation button may already have started this source through playFrom.
     if (audio.getAttribute("src") !== source) {
+      const seek = () => {
+        try {
+          if (target > 0 && Math.abs(audio.currentTime - target) > 0.25) audio.currentTime = target;
+        } catch { /* not seekable yet */ }
+      };
+      const ready = () => {
+        seek();
+        audio.removeEventListener("loadedmetadata", ready);
+        audio.removeEventListener("canplay", ready);
+      };
       audio.pause();
       audio.src = source;
       audio.volume = volume;
+      audio.addEventListener("loadedmetadata", ready);
+      audio.addEventListener("canplay", ready);
       audio.load();
+      seek();
+      return () => {
+        audio.removeEventListener("loadedmetadata", ready);
+        audio.removeEventListener("canplay", ready);
+      };
     }
   }, [enabled, playback]);
   useEffect(() => {
